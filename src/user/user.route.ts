@@ -42,7 +42,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/user', async (_req: Request, res: Response) => {
   try {
     const users = await db.models.User.findAll({
       include: [
@@ -63,39 +63,45 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 
-router.put('/:userId/subject', async (req:Request, res: Response) => {
-  try{
-    const userId = +req.params.userId;
-    const { subjectId } = req.body;
+router.put('/user/subjects', async (req: Request, res: Response) => {
+  try {
+    const { userId, subjects } = req.body;
+
+    if (!Array.isArray(subjects)) {
+      res.status(400).json({ error: 'Subjects must be an array of IDs.' });
+      return;
+    }
 
     const user = await db.models.User.findByPk(userId);
-    
-    if(!user){
-      res.status(404).json({error: 'User was not found'});
+
+    if (!user) {
+      res.status(404).json({ error: 'User was not found' });
       return;
     }
 
+    const validSubjects = await db.models.Subject.findAll({
+      where: {
+        id: subjects,
+      },
+    });
 
-    const subject = await db.models.Subject.findAll({where: {
-      id: subjectId,
-    }});
-
-    if(!subject){
-      res.status(404).json({error: 'Subject was not found'});
+    if (validSubjects.length !== subjects.length) {
+      res.status(400).json({ error: 'Subjects were not found.' });
       return;
     }
+
+    await user.setSubjects(validSubjects);
 
     const updatedUser = await db.models.User.findByPk(userId, {
       include: {
-        model:db.models.Subject,
+        model: db.models.Subject,
         as: 'subjects',
       },
     });
 
     res.status(200).json(updatedUser);
-
-  }catch(error:any){
-    res.status(500).json({error: error.message});
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
